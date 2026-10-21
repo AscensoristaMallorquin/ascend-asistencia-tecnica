@@ -5,6 +5,9 @@ const json = (value, status = 200) => Response.json(value, { status, headers: { 
 function b64url(bytes) { return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"); }
 function pemBytes(pem) { return Uint8Array.from(atob(pem.replace(/-----[^-]+-----/g, "").replace(/\s/g, "")), c => c.charCodeAt(0)); }
 async function driveToken(env) {
+  if (!env.GOOGLE_DRIVE_FOLDER_ID || !env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+    throw Object.assign(new Error("Google Drive todavía no está configurado completamente."), { status: 503 });
+  }
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(new TextEncoder().encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
   const claim = b64url(new TextEncoder().encode(JSON.stringify({ iss: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, scope: DRIVE_SCOPE, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 })));
@@ -50,7 +53,10 @@ export async function onRequest({ request, env, params }) {
     const url = new URL(request.url), path = (params.path || []).join("/");
     if (path === "config" && request.method === "GET") return json({ auth_mode: "firebase", firebase: { apiKey: env.FIREBASE_API_KEY, authDomain: env.FIREBASE_AUTH_DOMAIN, projectId: env.FIREBASE_PROJECT_ID, appId: env.FIREBASE_APP_ID } });
     if (path === "health" && request.method === "GET") return json({ ok: true });
-    if (path === "status" && request.method === "GET") return json({ drive_configured: !!env.GOOGLE_DRIVE_FOLDER_ID, drive_connected: !!env.GOOGLE_DRIVE_FOLDER_ID, domains: [], sources: [] });
+    if (path === "status" && request.method === "GET") {
+      const driveConfigured = !!(env.GOOGLE_DRIVE_FOLDER_ID && env.GOOGLE_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
+      return json({ drive_configured: driveConfigured, drive_connected: driveConfigured, domains: [], sources: [] });
+    }
 
     const user = await userFor(request, env);
     if (path === "account" && request.method === "GET") return json({ user: { uid: user.uid, email: user.email, admin: user.admin }, permissions: user });
