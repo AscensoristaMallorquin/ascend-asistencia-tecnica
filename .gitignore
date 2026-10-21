@@ -1,0 +1,4 @@
+.env
+.ascend-state.json
+.ascend-state.tmp
+__pycache__/
