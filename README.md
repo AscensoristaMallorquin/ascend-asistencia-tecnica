@@ -17,7 +17,7 @@ Los límites gratuitos que Cloudflare publica actualmente incluyen 100.000 solic
 
 El repositorio público ya está creado en GitHub. El sitio aún no está desplegado en Cloudflare y faltan configurar las cuentas de Cloudflare y Google. Inicia sesión allí tú cuando se te solicite; nunca pegues contraseñas o claves en el chat.
 
-1. **Subir el backend y el esquema** al repositorio público existente. No incluyas `.env`, `.ascend-state.json`, claves privadas, credenciales descargadas ni manuales. `.gitignore` ya excluye los archivos locales sensibles.
+1. El backend `functions/api/[[path]].js` y el esquema `cloudflare/schema.sql` ya están en este repositorio público. Nunca subas `.env`, `.ascend-state.json`, claves privadas, credenciales descargadas ni manuales.
 2. **Crear recursos en Cloudflare:** crea una base de datos D1 llamada `ascend` y pega el contenido de `cloudflare/schema.sql` en su consola SQL; crea un bucket R2 llamado `ascend-manuals`.
 3. **Conectar Pages con GitHub:** en Cloudflare, crea una aplicación Pages conectada al repositorio. Para una web HTML sin compilación, usa el directorio raíz como carpeta de salida. Añade bindings en la configuración de Pages Functions: D1 con variable `DB` hacia `ascend`, y R2 con variable `FILES` hacia `ascend-manuals`.
 4. En **Settings → Variables and Secrets** de Pages Functions, configura:
