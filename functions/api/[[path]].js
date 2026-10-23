@@ -2,7 +2,8 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const STOP = new Set(["error", "errores", "codigo", "código", "falla", "fallo", "maniobra", "manual", "ascensor", "ascensores", "que", "qué", "significa", "para", "del", "con", "una", "como", "por", "las", "los", "the", "what", "does"]);
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
-function b64url(bytes) { return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"); }function pemBytes(value) {
+function b64url(bytes) { return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"); }
+function pemBytes(value) {
   let pem = String(value || "").trim();
   if (pem.startsWith("{")) {
     try {
@@ -15,7 +16,7 @@ function b64url(bytes) { return btoa(String.fromCharCode(...new Uint8Array(bytes
     catch { pem = pem.replace(/^["']|["'],?$/g, ""); }
   }
   pem = pem.replace(/\\r?\\n/g, "\n").replace(/\\n/g, "\n");
-  const match = pem.match(/-----BEGIN PRIVATE KEY-----([\\s\\S]*?)-----END PRIVATE KEY-----/);
+  const match = pem.match(/-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/);
   if (!match) throw new Error("La clave privada no tiene el formato PEM esperado.");
   const base64 = match[1].replace(/[^A-Za-z0-9+/=]/g, "");
   try {
