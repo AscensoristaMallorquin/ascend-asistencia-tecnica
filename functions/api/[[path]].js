@@ -2,8 +2,29 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const STOP = new Set(["error", "errores", "codigo", "código", "falla", "fallo", "maniobra", "manual", "ascensor", "ascensores", "que", "qué", "significa", "para", "del", "con", "una", "como", "por", "las", "los", "the", "what", "does"]);
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
-function b64url(bytes) { return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"); }
-function pemBytes(pem) { return Uint8Array.from(atob(pem.replace(/-----[^-]+-----/g, "").replace(/\s/g, "")), c => c.charCodeAt(0)); }
+function b64url(bytes) { return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"); }function pemBytes(value) {
+  let pem = String(value || "").trim();
+  if (pem.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(pem);
+      if (typeof parsed.private_key === "string") pem = parsed.private_key;
+    } catch {}
+  }
+  if (pem.startsWith('"')) {
+    try { pem = JSON.parse(pem.replace(/,\s*$/, "")); }
+    catch { pem = pem.replace(/^["']|["'],?$/g, ""); }
+  }
+  pem = pem.replace(/\\r?\\n/g, "\n").replace(/\\n/g, "\n");
+  const match = pem.match(/-----BEGIN PRIVATE KEY-----([\\s\\S]*?)-----END PRIVATE KEY-----/);
+  if (!match) throw new Error("La clave privada no tiene el formato PEM esperado.");
+  const base64 = match[1].replace(/[^A-Za-z0-9+/=]/g, "");
+  try {
+    if (!base64 || base64.length % 4 !== 0) throw new Error();
+    return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  } catch {
+    throw new Error("La clave privada no tiene un formato válido. Vuelve a copiar el campo private_key del archivo JSON.");
+  }
+}
 async function driveToken(env) {
   if (!env.GOOGLE_DRIVE_FOLDER_ID || !env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
     throw Object.assign(new Error("Google Drive todavía no está configurado completamente."), { status: 503 });
