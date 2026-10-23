@@ -60,14 +60,15 @@ async function userFor(request, env) {
 }
 function admin(user) { if (!user.admin) throw Object.assign(new Error("Solo la administradora puede realizar esta acción."), { status: 403 }); }
 function readable(user) { if (!user.read) throw Object.assign(new Error("Tu cuenta aún no tiene permiso de lectura. Pide acceso a la administradora."), { status: 403 }); }
-async function driveFiles(env, search = "") {
+async function driveFiles(env, search = "", pageToken = "") {
   const token = await driveToken(env);
   const types = "(mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document' or mimeType='application/msword' or mimeType='text/plain' or mimeType='application/vnd.google-apps.document')";
   const clauses = [`'${env.GOOGLE_DRIVE_FOLDER_ID}' in parents`, "trashed=false", types];
   if (search) for (const term of search) clauses.push(`fullText contains '${term.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
-  const query = new URLSearchParams({ q: clauses.join(" and "), pageSize: "100", orderBy: "modifiedTime desc", fields: "files(id,name,mimeType,size,modifiedTime,parents)" });
-  const files = (await (await google(token, `https://www.googleapis.com/drive/v3/files?${query}`)).json()).files || [];
-  return { token, files };
+  const query = new URLSearchParams({ q: clauses.join(" and "), pageSize: "100", orderBy: "modifiedTime desc", fields: "files(id,name,mimeType,size,modifiedTime,parents),nextPageToken" });
+  if (pageToken) query.set("pageToken", pageToken);
+  const page = await (await google(token, `https://www.googleapis.com/drive/v3/files?${query}`)).json();
+  return { token, files: page.files || [], nextPageToken: page.nextPageToken || "" };
 }
 
 export async function onRequest({ request, env, params }) {
@@ -101,8 +102,8 @@ export async function onRequest({ request, env, params }) {
       return json({ ok: true });
     }
     if (path === "google/files" && request.method === "GET") {
-      admin(user); const { files } = await driveFiles(env); const { results } = await env.DB.prepare("SELECT id FROM manuals").all(); const imported = new Set(results.map(x => x.id));
-      return json({ files: files.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType, imported: imported.has(f.id) })) });
+      admin(user); const pageToken = url.searchParams.get("pageToken") || ""; const { files, nextPageToken } = await driveFiles(env, "", pageToken); const { results } = await env.DB.prepare("SELECT id FROM manuals").all(); const imported = new Set(results.map(x => x.id));
+      return json({ files: files.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType, imported: imported.has(f.id) })), nextPageToken });
     }
     if (path === "search" && request.method === "POST") {
       readable(user); const question = String((await request.json()).message || "").trim();
