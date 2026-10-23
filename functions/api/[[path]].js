@@ -60,7 +60,7 @@ async function userFor(request, env) {
 }
 function admin(user) { if (!user.admin) throw Object.assign(new Error("Solo la administradora puede realizar esta acción."), { status: 403 }); }
 function readable(user) { if (!user.read) throw Object.assign(new Error("Tu cuenta aún no tiene permiso de lectura. Pide acceso a la administradora."), { status: 403 }); }
-async function driveFiles(env, search = "", pageToken = "") {
+async function uploadManual(r,e,u){admin(u);const f=(await r.formData()).get("manual"),n=String(f?.name||"manual").slice(0,180),types={pdf:"application/pdf",doc:"application/msword",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",txt:"text/plain"},t=types[n.toLowerCase().split(".").pop()];if(!f?.size||!t)return json({error:"Elige PDF, Word o TXT."},400);if(f.size>41943040)return json({error:"Máximo 40 MB."},400);const id=crypto.randomUUID(),o="manuals/"+id;await e.FILES.put(o,await f.arrayBuffer(),{httpMetadata:{contentType:t}});await e.DB.prepare("INSERT INTO manuals(id,name,mimeType,object) VALUES(?,?,?,?)").bind(id,n,t,o).run();return json({ok:true,id,name:n});}async function driveFiles(env, search = "", pageToken = "") {
   const token = await driveToken(env);
   const types = "(mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document' or mimeType='application/msword' or mimeType='text/plain' or mimeType='application/vnd.google-apps.document')";
   const clauses = [`'${env.GOOGLE_DRIVE_FOLDER_ID}' in parents`, "trashed=false", types];
@@ -114,7 +114,7 @@ export async function onRequest({ request, env, params }) {
       const matches = files.filter(f => allowed.has(f.id)).map(f => ({ ...f, name_match: terms.filter(t => f.name.toLowerCase().includes(t.toLowerCase())).length })).sort((a,b)=>b.name_match-a.name_match || (b.modifiedTime||"").localeCompare(a.modifiedTime||""));
       return json({ query: question, terms, files: matches.slice(0,30).map(f=>({ id:f.id,name:f.name,webViewLink:`/api/manual/${encodeURIComponent(f.id)}`})), message: "La búsqueda localiza documentos que pueden contener esos términos; no muestra una página ni interpreta el código. Confirma el resultado y la revisión en el manual original." });
     }
-    if (path === "admin/import" && request.method === "POST") {
+    if(path==="admin/upload"&&request.method==="POST")return await uploadManual(request,env,user);if (path === "admin/import" && request.method === "POST") {
       admin(user); const id = String((await request.json()).id || "");
       if (!/^[\w-]{1,160}$/.test(id)) return json({ error: "Selecciona un documento válido de Drive." }, 400);
       const token = await driveToken(env), meta = await (await google(token, `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,size,trashed,parents`)).json();
